@@ -1,10 +1,6 @@
 terraform {
   required_version = ">= 1.3.0"
   required_providers {
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 3.0"
-    }
     aws = {
       source  = "hashicorp/aws"
       version = ">= 6.13.0"
@@ -13,57 +9,69 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.20"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.10"
+    }
   }
 }
 
 provider "aws" {
-  profile = "juan-devops"
-  region  = "ap-southeast-1"
+  profile = var.aws_profile
+  region  = var.aws_region
 }
 
-data "aws_caller_identity" "current" {}
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.token.token
+  }
+}
 
-# VPC Module
+data "aws_eks_cluster_auth" "token" {
+  name = module.eks.cluster_name
+}
+
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   name    = "tetris-vpc"
-  cidr    = "10.0.0.0/16"
-  azs     = ["ap-southeast-1a", "ap-southeast-1b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+  cidr    = var.vpc_cidr
+  azs     = var.azs
+  private_subnets = var.private_subnets
+  public_subnets  = var.public_subnets
   enable_nat_gateway = true
   single_nat_gateway = true
 }
 
-# EKS Cluster
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
-  version         = "21.3.1" # add version
-  name            = "huan-tetris-mp-cluster" # change cluster_name to name
-  kubernetes_version = "1.32" # change cluster_version to kubernetes_version
-  subnet_ids         = module.vpc.private_subnets
+  cluster_name    = var.cluster_name
+  cluster_version = "1.27"
+  subnets         = module.vpc.private_subnets
   vpc_id          = module.vpc.vpc_id
 
   enable_irsa     = true
-  
+  manage_aws_auth = true
+
   eks_managed_node_groups = {
     default = {
-      desired_size     = 2
-      max_size     = 3
-      min_size     = 1
+      desired_capacity = 2
+      max_capacity     = 3
+      min_capacity     = 1
       instance_types   = ["t3.medium"]
-      #capacity_type    = "ON_DEMAND" # comment this out
+      labels = {
+        role = "worker"
+      }
     }
   }
-  #manage_aws_auth = true # comment this out
 
   tags = {
-    Environment = "dev" # change env to Environment
-    #Owner       = "Juan" # comment this out
+    Environment = "mock-project"
+    Owner       = "Juan"
   }
 }
 
-# IAM Policy for AWS Load Balancer Controller
 resource "aws_iam_policy" "alb_ingress_policy" {
   name        = "AWSLoadBalancerControllerIAMPolicy"
   path        = "/"
@@ -71,7 +79,6 @@ resource "aws_iam_policy" "alb_ingress_policy" {
   policy      = file("${path.module}/iam/alb-ingress-policy.json")
 }
 
-# IAM Role for ALB Controller
 resource "aws_iam_role" "alb_ingress_role" {
   name = "eks-alb-ingress-role"
   assume_role_policy = jsonencode({
@@ -91,19 +98,37 @@ resource "aws_iam_role_policy_attachment" "alb_ingress_attach" {
   policy_arn = aws_iam_policy.alb_ingress_policy.arn
 }
 
-# Output
-output "cluster_name" {
-  value = module.eks.cluster_name
-}
+resource "helm_release" "aws_load_balancer_controller" {
+  name       = "aws-load-balancer-controller"
+  namespace  = "kube-system"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-load-balancer-controller"
+  version    = "1.6.2"
 
-output "cluster_endpoint" {
-  value = module.eks.cluster_endpoint
-}
+  set {
+    name  = "clusterName"
+    value = var.cluster_name
+  }
 
-output "cluster_security_group_id" {
-  value = module.eks.cluster_security_group_id
-}
+  set {
+    name  = "region"
+    value = var.aws_region
+  }
 
-output "node_group_role_arn" {
-  value = module.eks.node_group_iam_role_arn
+  set {
+    name  = "vpcId"
+    value = module.vpc.vpc_id
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "false"
+  }
+
+  set {
+    name  = "serviceAccount.name"
+    value = "aws-load-balancer-controller"
+  }
+
+  depends_on = [module.eks]
 }

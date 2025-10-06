@@ -18,8 +18,12 @@ output "eks_cluster_security_group_id" {
 #  value       = module.eks.node_groups["default"].iam_role_arn
 #}
 
-output "all_node_group_role_arns" {
-  value = [for ng in keys(module.eks.node_groups) : module.eks.node_groups[ng].iam_role_arn]
+#output "all_node_group_role_arns" {
+#  value = [for ng in keys(module.eks.node_groups) : module.eks.node_groups[ng].iam_role_arn]
+#}
+
+output "eks_node_group_role_arn" {
+  value = module.eks.eks_managed_node_groups["default"].iam_role_arn
 }
 
 output "vpc_id" {
