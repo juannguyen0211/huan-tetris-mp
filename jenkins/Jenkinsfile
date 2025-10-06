@@ -1,0 +1,33 @@
+pipeline {
+  agent any
+  environment {
+    DOCKER_IMAGE = "juannguyen0211/huan-gametetris-mp:latest"
+    KUBE_NAMESPACE = "huan-tetris-mp-ns"
+  }
+  stages {
+    stage('Build Docker Image') {
+      steps {
+        sh 'docker build -t $DOCKER_IMAGE .'
+      }
+    }
+    stage('Push Docker Image') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+          sh 'echo $PASSWORD | docker login -u $USERNAME --password-stdin'
+          sh 'docker push $DOCKER_IMAGE'
+        }
+      }
+    }
+    stage('Deploy to EKS') {
+      steps {
+        sh '''
+          aws eks --region ap-southeast-1 update-kubeconfig --name huan-tetris-mp-cluster --profile juan-devops
+          kubectl apply -f manifests/01.namespace.yaml
+          kubectl apply -f manifests/02.deployment.yaml
+          kubectl apply -f manifests/03.service.yaml
+          kubectl apply -f manifests/04.ingress.yaml
+        '''
+      }
+    }
+  }
+}

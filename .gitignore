@@ -1,0 +1,7 @@
+# Ignore Terraform state files
+./.terraform/
+*.tfstate
+*.tfstate.backup
+test.tfplan
+test
+golive

@@ -1,0 +1,104 @@
+terraform {
+  required_version = ">= 1.3.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.20"
+    }
+  }
+}
+
+provider "aws" {
+  profile = "juan-devops"
+  region  = "ap-southeast-1"
+}
+
+data "aws_caller_identity" "current" {}
+
+# VPC Module
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  name    = "tetris-vpc"
+  cidr    = "10.0.0.0/16"
+  azs     = ["ap-southeast-1a", "ap-southeast-1b"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+  enable_nat_gateway = true
+  single_nat_gateway = true
+}
+
+# EKS Cluster
+module "eks" {
+  source          = "terraform-aws-modules/eks/aws"
+  cluster_name    = "mock-tetris-cluster"
+  cluster_version = "1.32"
+  subnets         = module.vpc.private_subnets
+  vpc_id          = module.vpc.vpc_id
+
+  enable_irsa     = true
+  manage_aws_auth = true
+
+  node_groups = {
+    default = {
+      desired_capacity = 2
+      max_capacity     = 3
+      min_capacity     = 1
+      instance_types   = ["t3.medium"]
+      capacity_type    = "ON_DEMAND"
+    }
+  }
+
+  tags = {
+    Environment = "mock-project"
+    Owner       = "Juan"
+  }
+}
+
+# IAM Policy for AWS Load Balancer Controller
+resource "aws_iam_policy" "alb_ingress_policy" {
+  name        = "AWSLoadBalancerControllerIAMPolicy"
+  path        = "/"
+  description = "Policy for AWS Load Balancer Controller"
+  policy      = file("${path.module}/iam/alb-ingress-policy.json")
+}
+
+# IAM Role for ALB Controller
+resource "aws_iam_role" "alb_ingress_role" {
+  name = "eks-alb-ingress-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "alb_ingress_attach" {
+  role       = aws_iam_role.alb_ingress_role.name
+  policy_arn = aws_iam_policy.alb_ingress_policy.arn
+}
+
+# Output
+output "cluster_name" {
+  value = module.eks.cluster_name
+}
+
+output "cluster_endpoint" {
+  value = module.eks.cluster_endpoint
+}
+
+output "cluster_security_group_id" {
+  value = module.eks.cluster_security_group_id
+}
+
+output "node_group_role_arn" {
+  value = module.eks.node_group_iam_role_arn
+}

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tetris-service
+  namespace: huan-tetris-mp-ns
+spec:
+  selector:
+    app: tetris
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
