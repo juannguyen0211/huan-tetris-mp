@@ -51,26 +51,28 @@ module "vpc" {
 }
 
 module "eks" {
-  source          = "terraform-aws-modules/eks/aws"
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 19.0"
+
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
-  subnets         = module.vpc.private_subnets
-  vpc_id          = module.vpc.vpc_id
 
-  enable_irsa     = true
-  manage_aws_auth = true
+  cluster_endpoint_public_access = true
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
 
   eks_managed_node_groups = {
     default = {
-      desired_capacity = 2
-      max_capacity     = 3
-      min_capacity     = 1
-      instance_types   = ["t3.medium"]
-      labels = {
-        role = "worker"
-      }
+      node_group_name = "default"
+      instance_types  = ["t3.medium"]
+      desired_size    = 2
+      max_size        = 3
+      min_size        = 1
     }
   }
+
+  enable_cluster_creator_admin_permissions = true
 
   tags = {
     Environment = "mock-project"
