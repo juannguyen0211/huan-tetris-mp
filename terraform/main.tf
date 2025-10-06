@@ -34,27 +34,28 @@ module "vpc" {
 # EKS Cluster
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
-  cluster_name    = "mock-tetris-cluster"
-  cluster_version = "1.32"
-  subnets         = module.vpc.private_subnets
+  version         = "21.3.1" # add version
+  name            = "huan-tetris-mp-cluster" # change cluster_name to name
+  kubernetes_version = "1.32" # change cluster_version to kubernetes_version
+  subnets_ids         = module.vpc.private_subnets
   vpc_id          = module.vpc.vpc_id
 
   enable_irsa     = true
   manage_aws_auth = true
 
-  node_groups = {
+  eks_managed_node_groups = {
     default = {
-      desired_capacity = 2
-      max_capacity     = 3
-      min_capacity     = 1
+      desired_size     = 2
+      max_size     = 3
+      min_size     = 1
       instance_types   = ["t3.medium"]
-      capacity_type    = "ON_DEMAND"
+      #capacity_type    = "ON_DEMAND" # comment this out
     }
   }
 
   tags = {
-    Environment = "mock-project"
-    Owner       = "Juan"
+    Environment = "dev" # change env to Environment
+    #Owner       = "Juan" # comment this out
   }
 }
 
