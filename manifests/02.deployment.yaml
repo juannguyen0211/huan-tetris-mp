@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tetris-deployment
-  namespace: huan-tetris-mp-ns
+  namespace: huan-gametetris-mp-ns
 spec:
   replicas: 2
   selector:

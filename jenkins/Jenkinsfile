@@ -4,7 +4,14 @@ pipeline {
     DOCKER_IMAGE = "juannguyen0211/huan-gametetris-mp:latest"
     KUBE_NAMESPACE = "huan-tetris-mp-ns"
   }
+  
   stages {
+    stage('Checkout') {
+      steps {
+        git 'https://github.com/juannguyen0211/huan-gametetris-mp.git'
+      }
+    }
+  
     stage('Build Docker Image') {
       steps {
         sh 'docker build -t $DOCKER_IMAGE .'

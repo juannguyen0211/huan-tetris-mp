@@ -2,16 +2,13 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: tetris-ingress
-  namespace: huan-tetris-mp-ns
+  namespace: huan-gametetris-mp-ns
   annotations:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:region:account:certificate/your-cloudflare-cert-id
 spec:
   rules:
-  - host: mock-game.jn7n-vn.com
-    http:
+  - http:
       paths:
       - path: /
         pathType: Prefix

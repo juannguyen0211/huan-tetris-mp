@@ -2,11 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: tetris-service
-  namespace: huan-tetris-mp-ns
+  namespace: huan-gametetris-mp-ns
 spec:
   selector:
     app: tetris
   ports:
-  - port: 80
-    targetPort: 80
-  type: ClusterIP
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort
