@@ -37,12 +37,11 @@ module "eks" {
   version         = "21.3.1" # add version
   name            = "huan-tetris-mp-cluster" # change cluster_name to name
   kubernetes_version = "1.32" # change cluster_version to kubernetes_version
-  subnets_ids         = module.vpc.private_subnets
+  subnet_ids         = module.vpc.private_subnets
   vpc_id          = module.vpc.vpc_id
 
   enable_irsa     = true
-  manage_aws_auth = true
-
+  
   eks_managed_node_groups = {
     default = {
       desired_size     = 2
@@ -52,6 +51,7 @@ module "eks" {
       #capacity_type    = "ON_DEMAND" # comment this out
     }
   }
+  #manage_aws_auth = true # comment this out
 
   tags = {
     Environment = "dev" # change env to Environment
