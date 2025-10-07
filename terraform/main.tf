@@ -44,12 +44,11 @@ module "eks" {
 }
 
 module "eks_auth" {
-  source  = "terraform-aws-modules/eks/aws//modules/aws-auth"
-  version = "20.8.4"
+  source  = "terraform-aws-modules/aws-auth/kubernetes"
+  version = "1.0.1"
 
-  eks_cluster_id = module.eks.cluster_id
-
-  map_users = [
+  manage_aws_auth_configmap = true
+  aws_auth_users = [
     {
       userarn  = "arn:aws:iam::194160273025:user/root"
       username = "root"
@@ -57,5 +56,6 @@ module "eks_auth" {
     }
   ]
 
+  eks_cluster_name = module.eks.cluster_name
   depends_on = [module.eks]
 }
