@@ -1,61 +1,175 @@
-provider "aws" {
-  profile = var.profile
-  region  = var.region
+###############################################################################
+# VPC & Networking
+###############################################################################
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 }
 
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "5.1.2"
-
-  name = "huan-tetris-vpc"
-  cidr = "10.0.0.0/16"
-
-  azs             = ["ap-southeast-1a", "ap-southeast-1b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
-
-  enable_nat_gateway = true
-  single_nat_gateway = true
-
-  tags = var.tags
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
 }
 
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "20.8.4"
+resource "aws_subnet" "subnet_a" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "ap-southeast-1a"
+  map_public_ip_on_launch = true
+}
 
-  cluster_name    = var.cluster_name
-  cluster_version = var.cluster_version
-  subnet_ids      = module.vpc.private_subnets
-  vpc_id          = module.vpc.vpc_id
+resource "aws_subnet" "subnet_b" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "ap-southeast-1b"
+  map_public_ip_on_launch = true
+}
 
-  enable_irsa = true
+resource "aws_route_table" "rt" {
+  vpc_id = aws_vpc.main.id
 
-  eks_managed_node_groups = {
-    default = {
-      instance_types = var.node_instance_types
-      min_size       = 1
-      max_size       = 3
-      desired_size   = 2
-    }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+}
+
+resource "aws_route_table_association" "a" {
+  subnet_id      = aws_subnet.subnet_a.id
+  route_table_id = aws_route_table.rt.id
+}
+
+resource "aws_route_table_association" "b" {
+  subnet_id      = aws_subnet.subnet_b.id
+  route_table_id = aws_route_table.rt.id
+}
+
+###############################################################################
+# IAM Roles
+###############################################################################
+# Role for EKS Cluster
+resource "aws_iam_role" "eks_cluster_role" {
+  name = "huan-tetris-eks-cluster-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = { Service = "eks.amazonaws.com" },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.eks_cluster_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_AmazonEKSServicePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+  role       = aws_iam_role.eks_cluster_role.name
+}
+
+# Role for EKS Nodes
+resource "aws_iam_role" "eks_nodes_role" {
+  name = "huan-tetris-eks-nodes-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = { Service = "ec2.amazonaws.com" },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "node_AmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.eks_nodes_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_AmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.eks_nodes_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.eks_nodes_role.name
+}
+
+###############################################################################
+# EKS Cluster
+###############################################################################
+resource "aws_eks_cluster" "huan_tetris" {
+  name     = var.cluster_name
+  role_arn = aws_iam_role.eks_cluster_role.arn
+  version  = "1.30"
+
+  vpc_config {
+    subnet_ids = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
   }
 
-  tags = var.tags
+  depends_on = [
+    aws_iam_role_policy_attachment.cluster_AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.cluster_AmazonEKSServicePolicy
+  ]
 }
 
-module "eks_auth" {
-  source  = "terraform-aws-modules/aws-auth/kubernetes"
-  version = "1.0.1"
+###############################################################################
+# aws-auth ConfigMap (for node group authentication)
+###############################################################################
+resource "kubernetes_config_map" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
 
-  manage_aws_auth_configmap = true
-  aws_auth_users = [
-    {
-      userarn  = "arn:aws:iam::194160273025:user/root"
-      username = "root"
-      groups   = ["system:masters"]
-    }
+  data = {
+    mapRoles = yamlencode([{
+      rolearn  = aws_iam_role.eks_nodes_role.arn
+      username = "system:node:{{EC2PrivateDNSName}}"
+      groups   = ["system:bootstrappers", "system:nodes"]
+    }])
+  }
+
+  depends_on = [aws_eks_cluster.huan_tetris]
+}
+
+###############################################################################
+# EKS Node Group
+###############################################################################
+resource "aws_eks_node_group" "nodes" {
+  cluster_name    = aws_eks_cluster.huan_tetris.name
+  node_group_name = "huan-tetris-nodes"
+  node_role_arn   = aws_iam_role.eks_nodes_role.arn
+  subnet_ids      = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
+  instance_types  = ["c7i-flex.large"]
+
+  scaling_config {
+    desired_size = 2
+    max_size     = 3
+    min_size     = 2
+  }
+
+  depends_on = [
+    kubernetes_config_map.aws_auth,
+    aws_iam_role_policy_attachment.node_AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.node_AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.node_AmazonEC2ContainerRegistryReadOnly
   ]
+}
 
-  eks_cluster_name = module.eks.cluster_name
-  depends_on = [module.eks]
+###############################################################################
+# Generate kubeconfig file automatically
+###############################################################################
+resource "local_file" "kubeconfig" {
+  content = templatefile("${path.module}/templates/kubeconfig.tpl", {
+    cluster_name = aws_eks_cluster.huan_tetris.name
+    endpoint     = aws_eks_cluster.huan_tetris.endpoint
+    ca_data      = aws_eks_cluster.huan_tetris.certificate_authority[0].data
+  })
+  filename = "${path.module}/kubeconfig_${aws_eks_cluster.huan_tetris.name}"
 }

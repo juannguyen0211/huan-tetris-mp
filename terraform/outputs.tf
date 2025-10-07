@@ -1,33 +1,14 @@
 output "cluster_name" {
-  description = "EKS cluster name"
-  value       = module.eks.cluster_name
+  description = "EKS Cluster name"
+  value       = aws_eks_cluster.huan_tetris.name
 }
 
 output "cluster_endpoint" {
-  description = "EKS cluster endpoint"
-  value       = module.eks.cluster_endpoint
+  description = "EKS Cluster API endpoint"
+  value       = aws_eks_cluster.huan_tetris.endpoint
 }
 
-output "cluster_version" {
-  description = "Kubernetes version"
-  value       = module.eks.cluster_version
-}
-
-output "vpc_id" {
-  description = "VPC ID used for EKS"
-  value       = module.vpc.vpc_id
-}
-
-output "private_subnets" {
-  description = "Private subnet IDs"
-  value       = module.vpc.private_subnets
-}
-
-output "node_group_role_arn" {
-  description = "IAM role ARN for node group"
-  value       = module.eks.eks_managed_node_groups["default"].iam_role_arn
-}
-
-output "eks_auth_configmap_yaml" {
-  value = module.eks_auth.configmap_yaml
+output "kubeconfig" {
+  description = "Generated kubeconfig file path"
+  value       = "${path.module}/kubeconfig_${aws_eks_cluster.huan_tetris.name}"
 }
