@@ -30,6 +30,15 @@ module "eks" {
   vpc_id          = module.vpc.vpc_id
 
   enable_irsa = true
+  manage_aws_auth = true
+
+  aws_auth_users = [
+    {
+      userarn  = "arn:aws:iam::194160273025:user/juan-devops"
+      username = "juan-devops"
+      groups   = ["system:masters"]
+    }
+  ]
 
   eks_managed_node_groups = {
     default = {
