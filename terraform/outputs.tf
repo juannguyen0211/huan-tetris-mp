@@ -27,3 +27,7 @@ output "node_group_role_arn" {
   description = "IAM role ARN for node group"
   value       = module.eks.eks_managed_node_groups["default"].iam_role_arn
 }
+
+output "eks_auth_configmap_yaml" {
+  value = module.eks_auth.configmap_yaml
+}

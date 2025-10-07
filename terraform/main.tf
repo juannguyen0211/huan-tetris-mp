@@ -30,15 +30,6 @@ module "eks" {
   vpc_id          = module.vpc.vpc_id
 
   enable_irsa = true
-  manage_aws_auth = true
-
-  aws_auth_users = [
-    {
-      userarn  = "arn:aws:iam::194160273025:user/juan-devops"
-      username = "juan-devops"
-      groups   = ["system:masters"]
-    }
-  ]
 
   eks_managed_node_groups = {
     default = {
@@ -50,4 +41,21 @@ module "eks" {
   }
 
   tags = var.tags
+}
+
+module "eks_auth" {
+  source  = "terraform-aws-modules/eks/aws//modules/aws-auth"
+  version = "20.8.4"
+
+  eks_cluster_id = module.eks.cluster_id
+
+  map_users = [
+    {
+      userarn  = "arn:aws:iam::194160273025:user/root"
+      username = "root"
+      groups   = ["system:masters"]
+    }
+  ]
+
+  depends_on = [module.eks]
 }
