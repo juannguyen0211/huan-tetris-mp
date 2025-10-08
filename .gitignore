@@ -4,5 +4,5 @@
 *.tfstate.backup
 *.terraform.lock.hcl
 *.terraform.tfstate.lock.info
-kubeconfig_huan-tetris-cluster
-*/kubeconfig_huan-tetris-cluster
+*.terraform.tfstate.*
+terraform/kubeconfig_huan-tetris-cluster
