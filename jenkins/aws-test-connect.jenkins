@@ -1,0 +1,59 @@
+pipeline {
+  agent any
+
+  environment {
+    CLUSTER_NAME = "huan-tetris-cluster"
+    REGION       = "ap-southeast-1"
+    KUBECONFIG   = "${WORKSPACE}/kubeconfig"
+  }
+
+  stages {
+    stage('Setup AWS and Kubeconfig') {
+      steps {
+        withAWS(credentials: 'aws-access-creds', region: "${REGION}") {
+          sh '''
+            echo "🔧 Updating kubeconfig for cluster: $CLUSTER_NAME ..."
+            aws eks update-kubeconfig \
+              --name "$CLUSTER_NAME" \
+              --region "$REGION" \
+              --kubeconfig "$KUBECONFIG"
+
+            echo "✅ Kubeconfig updated and saved to $KUBECONFIG"
+            kubectl --kubeconfig="$KUBECONFIG" cluster-info
+          '''
+        }
+      }
+    }
+
+    stage('Verify Cluster Access') {
+      steps {
+        withAWS(credentials: 'aws-access-creds', region: "${REGION}") {
+          sh '''
+            echo "🔍 Verifying access to EKS cluster..."
+            kubectl --kubeconfig="$KUBECONFIG" get nodes -o wide
+          '''
+        }
+      }
+    }
+
+    stage('Create Namespace: test') {
+      steps {
+        withAWS(credentials: 'aws-access-creds', region: "${REGION}") {
+          sh '''
+            echo "🚀 Creating namespace 'test' if not exists..."
+            kubectl --kubeconfig="$KUBECONFIG" create namespace test --dry-run=client -o yaml | \
+              kubectl --kubeconfig="$KUBECONFIG" apply -f - --validate=false
+            echo "✅ Namespace 'test' is ready."
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "🧹 Cleaning temporary kubeconfig..."
+      sh 'rm -f "$KUBECONFIG" || true'
+    }
+  }
+}
