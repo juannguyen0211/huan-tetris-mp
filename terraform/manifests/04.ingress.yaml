@@ -4,9 +4,11 @@ metadata:
   name: tetris-ingress
   namespace: huan-gametetris-mp-ns
   annotations:
-    kubernetes.io/ingress.class: alb
+    #kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/scheme: internet-facing
 spec:
+  ingressClassName: alb
   rules:
   - http:
       paths:

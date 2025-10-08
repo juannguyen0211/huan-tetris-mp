@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Update kubeconfig cluster
+#aws eks update-kubeconfig --name=$cluster_name --region=ap-southeast-1
+#export KUBECONFIG=./kubeconfig_huan-tetris-cluster
+
 # 1. Lấy thông tin từ Terraform output
 echo "Extracting Terraform outputs..."
 CLUSTER_NAME=$(terraform output -raw cluster_name)
@@ -49,8 +53,9 @@ eksctl create iamserviceaccount \
   --namespace=kube-system \
   --name=aws-load-balancer-controller \
   --attach-policy-arn=arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy \
-  --region=$REGION \
-  --approve
+  --override-existing-serviceaccounts \
+  --approve \
+  --region=$REGION
 
 # 5. Cài đặt AWS Load Balancer Controller bằng Helm
 echo "Installing AWS Load Balancer Controller via Helm..."
@@ -60,10 +65,9 @@ helm repo update
 helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
   -n kube-system \
   --set clusterName=$CLUSTER_NAME \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=aws-load-balancer-controller \
   --set region=$REGION \
-  --set vpcId=$VPC_ID
+  --set vpcId=$VPC_ID \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller
 
 echo "AWS Load Balancer Controller installation complete."
-kubectl get deployment -n kube-system aws-load-balancer-controller
