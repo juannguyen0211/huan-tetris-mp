@@ -2,8 +2,7 @@
 set -e
 
 # Update kubeconfig cluster
-#aws eks update-kubeconfig --name=$cluster_name --region=ap-southeast-1
-#export KUBECONFIG=./kubeconfig_huan-tetris-cluster
+export KUBECONFIG=./kubeconfig_huan-tetris-cluster
 
 # 1. Lấy thông tin từ Terraform output
 echo "Extracting Terraform outputs..."
