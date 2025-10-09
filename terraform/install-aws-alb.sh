@@ -70,3 +70,4 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set serviceAccount.name=aws-load-balancer-controller
 
 echo "AWS Load Balancer Controller installation complete."
+export KUBECONFIG=./kubeconfig_huan-tetris-cluster
