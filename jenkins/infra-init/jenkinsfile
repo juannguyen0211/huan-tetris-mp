@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+	  steps {
+		sshagent(['github-access']) {
+		  sh 'rm -rf huan-tetris-mp'
+		  sh 'git clone git@github.com:juannguyen0211/huan-tetris-mp.git'
+		}
+	  }
+	}
+
+        stage('Init EKS Infra') {
+            steps {
+                // Bind AWS credentials stored in Jenkins (adjust credentialsId as needed)
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-access-creds'
+                ]]) {
+                    dir('terraform') {
+                        // ensure script is executable and run the infra init script
+                        sh 'chmod +x infra-init.sh'
+                        sh './infra-init.sh'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo 'EKS infra init failed.'
+        }
+        success {
+            echo 'EKS infra init completed.'
+        }
+    }
+}
