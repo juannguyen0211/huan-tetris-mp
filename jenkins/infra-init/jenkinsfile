@@ -4,10 +4,7 @@ pipeline {
     stages {
         stage('Checkout') {
 	  steps {
-		sshagent(['github-access']) {
-		  sh 'rm -rf huan-tetris-mp'
-		  sh 'git clone git@github.com:juannguyen0211/huan-tetris-mp.git'
-		}
+		checkout scm
 	  }
 	}
 
