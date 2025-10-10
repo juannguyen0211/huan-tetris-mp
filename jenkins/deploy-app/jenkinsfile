@@ -1,0 +1,31 @@
+pipeline {
+  agent any
+  environment {
+	CLUSTER_NAME = "huan-tetris-cluster"
+    REGION       = "ap-southeast-1"
+    //YAML         = "${WORKSPACE}/terraform/manifests"
+  }
+  
+  stages {
+    stage('Checkout') {
+      steps {
+        deleteDir() // Clean workspace before checkout
+        checkout scm
+      }
+    }
+  }
+
+    stage('Deploy to EKS') {
+      steps {
+        dir('terraform/manifests') {
+		withAWS(credentials: 'aws-access-creds', region: "${REGION}") {
+			sh 'aws eks --region="$REGION" update-kubeconfig --name="$CLUSTER_NAME"'
+			sh 'kubectl apply -f 01.namespace.yaml'
+			sh 'kubectl apply -f 02.deployment.yaml'
+			sh 'kubectl apply -f 03.service.yaml'
+			sh 'kubectl apply -f 04.ingress.yaml'
+		}
+      }
+    }
+  }
+}
