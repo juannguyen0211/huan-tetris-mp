@@ -18,3 +18,10 @@ spec:
         image: juannguyen0211/huan-gametetris-mp:latest
         ports:
         - containerPort: 80
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
